@@ -88,7 +88,8 @@ class RAGChain:
             # Use Pinecone client directly from the new SDK
             from pinecone import Pinecone as PineconeClient
             
-            pc = PineconeClient(api_key=settings.google_api_key)
+            # Initialize with correct Pinecone API key (not Google API key)
+            pc = PineconeClient(api_key=settings.pinecone_api_key)
             
             # Initialize LangChain wrapper with the Pinecone index
             self.vector_store = Pinecone(
