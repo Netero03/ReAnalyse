@@ -27,12 +27,12 @@ class PineconeClient:
         try:
             self.logger.info("Initializing Pinecone client...")
 
-            # Initialize Pinecone with API key and environment
+            # Initialize Pinecone with API key
             self.pc = Pinecone(api_key=self.config["api_key"])
 
             self.logger.info(f"Connecting to index: {self.config['index_name']}")
 
-            # Connect to existing index (use Index class method)
+            # Connect to existing index
             self.index = self.pc.Index(self.config["index_name"])
 
             # Test connection
