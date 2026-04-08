@@ -1,7 +1,7 @@
 langchain>=0.1.0
 langchain-google-genai>=0.0.8
 google-generativeai>=0.3.0
-pinecone>=2.2.0
+pinecone-client==8.1.1
 streamlit>=1.28.0
 pypdf>=3.17.0
 python-dotenv>=1.0.0

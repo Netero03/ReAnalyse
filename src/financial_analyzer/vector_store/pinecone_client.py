@@ -32,8 +32,8 @@ class PineconeClient:
 
             self.logger.info(f"Connecting to index: {self.config['index_name']}")
 
-            # Connect to existing index (use lowercase index() method)
-            self.index = self.pc.index(self.config["index_name"])
+            # Connect to existing index (use Index class method)
+            self.index = self.pc.Index(self.config["index_name"])
 
             # Test connection
             index_stats = self.index.describe_index_stats()
