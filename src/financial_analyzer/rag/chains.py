@@ -2,11 +2,11 @@
 
 from typing import List, Dict, Optional, Any
 
-from langchain.chains import RetrievalQA
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import Pinecone
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate
 
 from financial_analyzer.config import settings
 from financial_analyzer.embeddings.gemini_embedder import GeminiEmbedder
@@ -26,7 +26,6 @@ class RAGChain:
 
     def __init__(
         self,
-        use_memory: bool = True,
         temperature: float = 0.2,
         max_tokens: int = 1024,
     ):
@@ -34,7 +33,6 @@ class RAGChain:
         Initialize RAG chain.
 
         Args:
-            use_memory: Whether to maintain conversation memory
             temperature: LLM temperature (lower = more deterministic)
             max_tokens: Maximum tokens in response
         """
@@ -46,7 +44,7 @@ class RAGChain:
         self._initialize_llm()
         self._initialize_embeddings()
         self._initialize_pinecone()
-        self._initialize_chain(use_memory)
+        self._initialize_chain()
 
     def _initialize_llm(self) -> None:
         """Initialize Gemini LLM."""
@@ -102,8 +100,8 @@ class RAGChain:
             self.logger.error(f"Failed to initialize Pinecone: {str(e)}")
             raise RAGChainError(f"Failed to initialize Pinecone: {str(e)}") from e
 
-    def _initialize_chain(self, use_memory: bool = True) -> None:
-        """Initialize RAG chain."""
+    def _initialize_chain(self) -> None:
+        """Initialize RAG chain using LCEL."""
         try:
             self.logger.info("Initializing RAG chain")
 
@@ -117,24 +115,30 @@ class RAGChain:
             # Create prompt template
             prompt = get_question_prompt()
 
-            # Initialize memory (optional)
-            self.memory = None
-            if use_memory:
-                self.memory = ConversationBufferMemory(
-                    memory_key="chat_history",
-                    return_messages=True,
+            # Build the chain
+            # Uses LCEL (LangChain Expression Language) to:
+            # 1. Pass through the input question
+            # 2. Retrieve documents using the retriever
+            # 3. Format documents into context string
+            # 4. Create prompt with question and context
+            # 5. Run through LLM
+            # 6. Parse the output as string
+            
+            def _format_docs(docs):
+                """Format retrieved documents into context string."""
+                return "\n\n".join(doc.page_content for doc in docs)
+            
+            # Store docs retrieval for source extraction
+            self.docs_retriever = self.retriever
+            
+            # Build the chain using LCEL
+            self.chain = (
+                RunnablePassthrough.assign(
+                    context=self.retriever | _format_docs
                 )
-
-            # Create RetrievalQA chain
-            self.chain = RetrievalQA.from_chain_type(
-                llm=self.llm,
-                chain_type="stuff",  # Combine documents into single prompt
-                retriever=self.retriever,
-                return_source_documents=True,
-                chain_type_kwargs={
-                    "prompt": prompt,
-                    "document_variable_name": "context",
-                },
+                | prompt
+                | self.llm
+                | StrOutputParser()
             )
 
             self.logger.info("RAG chain initialized successfully")
@@ -170,19 +174,22 @@ class RAGChain:
                 history_str = format_chat_history(chat_history)
                 input_text = f"Previous conversation:\n{history_str}\n\nNew question: {question}"
 
-            # Run chain
-            result = self.chain({"query": input_text})
+            # Run chain to get answer
+            answer = self.chain.invoke({"question": input_text})
+
+            # Retrieve source documents separately
+            source_documents = self.docs_retriever.invoke(question)
 
             # Format response
             response = {
-                "answer": result.get("result", ""),
-                "source_documents": result.get("source_documents", []),
+                "answer": answer,
+                "source_documents": source_documents,
                 "sources": [
                     {
                         "source": str(doc.metadata.get("source", "Unknown")),
                         "content": doc.page_content[:200] + "...",
                     }
-                    for doc in result.get("source_documents", [])
+                    for doc in source_documents
                 ],
             }
 
@@ -196,25 +203,35 @@ class RAGChain:
     def add_to_memory(self, role: str, content: str) -> None:
         """
         Add message to conversation memory.
+        
+        Note: Memory management is now handled by the UI layer (Streamlit).
+        This method is kept for backward compatibility but is a no-op.
 
         Args:
             role: 'user' or 'assistant'
             content: Message content
         """
-        if self.memory:
-            from langchain.schema import HumanMessage, AIMessage
-
-            if role.lower() == "user":
-                self.memory.chat_memory.add_user_message(content)
-            elif role.lower() == "assistant":
-                self.memory.chat_memory.add_ai_message(content)
+        # Memory management is now handled at the UI layer
+        pass
 
     def clear_memory(self) -> None:
-        """Clear conversation memory."""
-        if self.memory:
-            self.memory.clear()
-            self.logger.info("Memory cleared")
+        """
+        Clear conversation memory.
+        
+        Note: Memory management is now handled by the UI layer (Streamlit).
+        This method is kept for backward compatibility but is a no-op.
+        """
+        # Memory management is now handled at the UI layer
+        pass
 
-    def get_memory(self) -> Optional[ConversationBufferMemory]:
-        """Get conversation memory."""
-        return self.memory
+    def get_memory(self) -> None:
+        """
+        Get conversation memory.
+        
+        Note: Memory management is now handled by the UI layer (Streamlit).
+        This method is kept for backward compatibility.
+        
+        Returns:
+            None (memory is handled at UI layer)
+        """
+        return None

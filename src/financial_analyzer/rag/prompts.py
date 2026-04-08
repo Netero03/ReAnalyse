@@ -1,7 +1,6 @@
 """Prompt templates for financial document Q&A."""
 
-from langchain.prompts import PromptTemplate, ChatPromptTemplate
-from langchain.prompts.example_selector import LengthBasedExampleSelector
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
 
 
 # System prompt for financial Q&A
@@ -69,18 +68,14 @@ def get_qa_chat_prompt() -> ChatPromptTemplate:
 
 
 def get_example_selector():
-    """Get example selector for few-shot prompting."""
-    examples = FINANCIAL_EXAMPLES
-    example_prompt = PromptTemplate(
-        input_variables=["question", "context", "answer"],
-        template="Question: {question}\nContext: {context}\nAnswer: {answer}",
-    )
-
-    return LengthBasedExampleSelector(
-        examples=examples,
-        example_prompt=example_prompt,
-        max_length=2000,
-    )
+    """
+    Get example selector for few-shot prompting.
+    
+    Note: LengthBasedExampleSelector is not available in LangChain 1.2+.
+    This function is kept for backward compatibility but returns None.
+    Few-shot examples are not used in the current implementation.
+    """
+    return None
 
 
 def format_chat_history(messages: list) -> str:
