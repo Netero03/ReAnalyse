@@ -3,7 +3,8 @@
 import os
 from typing import Optional
 from dotenv import load_dotenv
-from pydantic import BaseSettings, Field, validator
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings
 
 # Load environment variables from .env file
 load_dotenv()
@@ -46,7 +47,8 @@ class Settings(BaseSettings):
     max_file_size_mb: int = Field(default=200, env="MAX_FILE_SIZE_MB")
     allowed_file_types: tuple = Field(default=("pdf",), env="ALLOWED_FILE_TYPES")
 
-    @validator("google_api_key", pre=True, always=True)
+    @field_validator("google_api_key", mode="before")
+    @classmethod
     def validate_google_api_key(cls, v: Optional[str]) -> str:
         """Validate that Gemini API key is provided."""
         if not v or v == "your_gemini_api_key_here":
@@ -55,7 +57,8 @@ class Settings(BaseSettings):
             )
         return v
 
-    @validator("pinecone_api_key", pre=True, always=True)
+    @field_validator("pinecone_api_key", mode="before")
+    @classmethod
     def validate_pinecone_api_key(cls, v: Optional[str]) -> str:
         """Validate that Pinecone API key is provided."""
         if not v or v == "your_pinecone_api_key_here":
@@ -64,7 +67,8 @@ class Settings(BaseSettings):
             )
         return v
 
-    @validator("pinecone_environment", pre=True, always=True)
+    @field_validator("pinecone_environment", mode="before")
+    @classmethod
     def validate_pinecone_environment(cls, v: Optional[str]) -> str:
         """Validate that Pinecone environment is provided."""
         if not v or v == "your_pinecone_environment_here":
@@ -73,7 +77,8 @@ class Settings(BaseSettings):
             )
         return v
 
-    @validator("log_level")
+    @field_validator("log_level")
+    @classmethod
     def validate_log_level(cls, v: str) -> str:
         """Validate log level."""
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -81,7 +86,8 @@ class Settings(BaseSettings):
             raise ValueError(f"Invalid log level. Must be one of {valid_levels}")
         return v.upper()
 
-    @validator("chunk_size")
+    @field_validator("chunk_size")
+    @classmethod
     def validate_chunk_size(cls, v: int) -> int:
         """Validate chunk size."""
         if v < 100:
@@ -90,27 +96,25 @@ class Settings(BaseSettings):
             raise ValueError("Chunk size must not exceed 5000 characters")
         return v
 
-    @validator("chunk_overlap")
-    def validate_chunk_overlap(cls, v: int, values) -> int:
+    @field_validator("chunk_overlap")
+    @classmethod
+    def validate_chunk_overlap(cls, v: int, info) -> int:
         """Validate chunk overlap."""
         if v < 0:
             raise ValueError("Chunk overlap cannot be negative")
-        if "chunk_size" in values and v >= values["chunk_size"]:
+        if "chunk_size" in info.data and v >= info.data["chunk_size"]:
             raise ValueError("Chunk overlap must be less than chunk size")
         return v
 
-    @validator("max_retrieved_chunks")
+    @field_validator("max_retrieved_chunks")
+    @classmethod
     def validate_max_retrieved_chunks(cls, v: int) -> int:
         """Validate max retrieved chunks."""
         if v < 1 or v > 20:
             raise ValueError("Max retrieved chunks must be between 1 and 20")
         return v
 
-    class Config:
-        """Pydantic config."""
-
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {"env_file": ".env", "case_sensitive": False}
 
     def get_gemini_config(self) -> dict:
         """Get Gemini API configuration."""

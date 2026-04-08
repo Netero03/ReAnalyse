@@ -4,7 +4,6 @@ from typing import List, Dict, Optional, Tuple
 import os
 from datetime import datetime
 
-import pinecone
 from pinecone import Pinecone, ServerlessSpec
 
 from financial_analyzer.config import settings
