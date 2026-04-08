@@ -3,8 +3,8 @@
 import os
 from typing import Optional
 from dotenv import load_dotenv
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator, ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load environment variables from .env file
 load_dotenv()
@@ -14,38 +14,36 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Gemini API Configuration
-    google_api_key: str = Field(..., env="GOOGLE_API_KEY")
-    embedding_model: str = Field(default="models/embedding-001", env="EMBEDDING_MODEL")
-    model_name: str = Field(default="gemini-1.5-flash", env="MODEL_NAME")
+    google_api_key: str = Field(...)
+    embedding_model: str = Field(default="models/embedding-001")
+    model_name: str = Field(default="gemini-1.5-flash")
 
     # Pinecone Configuration
-    pinecone_api_key: str = Field(..., env="PINECONE_API_KEY")
-    pinecone_environment: str = Field(..., env="PINECONE_ENVIRONMENT")
-    pinecone_index_name: str = Field(
-        default="financial-documents", env="PINECONE_INDEX_NAME"
-    )
-    pinecone_namespace: str = Field(default="default", env="PINECONE_NAMESPACE")
-    pinecone_metric: str = Field(default="cosine", env="PINECONE_METRIC")
+    pinecone_api_key: str = Field(...)
+    pinecone_environment: str = Field(...)
+    pinecone_index_name: str = Field(default="financial-documents")
+    pinecone_namespace: str = Field(default="default")
+    pinecone_metric: str = Field(default="cosine")
 
     # Chunking Configuration
-    chunk_size: int = Field(default=1000, env="CHUNK_SIZE")
-    chunk_overlap: int = Field(default=100, env="CHUNK_OVERLAP")
+    chunk_size: int = Field(default=1000)
+    chunk_overlap: int = Field(default=100)
 
     # Retrieval Configuration
-    max_retrieved_chunks: int = Field(default=5, env="MAX_RETRIEVED_CHUNKS")
-    retrieval_threshold: float = Field(default=0.5, env="RETRIEVAL_THRESHOLD")
+    max_retrieved_chunks: int = Field(default=5)
+    retrieval_threshold: float = Field(default=0.5)
 
     # Logging Configuration
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_level: str = Field(default="INFO")
 
     # Streamlit Configuration
-    streamlit_server_headless: bool = Field(default=True, env="STREAMLIT_SERVER_HEADLESS")
-    streamlit_server_port: int = Field(default=8501, env="STREAMLIT_SERVER_PORT")
+    streamlit_server_headless: bool = Field(default=True)
+    streamlit_server_port: int = Field(default=8501)
 
     # Application Configuration
-    debug_mode: bool = Field(default=False, env="DEBUG_MODE")
-    max_file_size_mb: int = Field(default=200, env="MAX_FILE_SIZE_MB")
-    allowed_file_types: tuple = Field(default=("pdf",), env="ALLOWED_FILE_TYPES")
+    debug_mode: bool = Field(default=False)
+    max_file_size_mb: int = Field(default=200)
+    allowed_file_types: tuple = Field(default=("pdf",))
 
     @field_validator("google_api_key", mode="before")
     @classmethod
@@ -114,7 +112,7 @@ class Settings(BaseSettings):
             raise ValueError("Max retrieved chunks must be between 1 and 20")
         return v
 
-    model_config = {"env_file": ".env", "case_sensitive": False}
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
     def get_gemini_config(self) -> dict:
         """Get Gemini API configuration."""
