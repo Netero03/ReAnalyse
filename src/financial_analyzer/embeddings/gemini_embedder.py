@@ -24,7 +24,7 @@ class GeminiEmbedder:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "models/embedding-001",
+        model: Optional[str] = None,
         task_type: str = "question_answering",
     ):
         """
@@ -32,11 +32,11 @@ class GeminiEmbedder:
 
         Args:
             api_key: Gemini API key (default: from settings)
-            model: Model to use (default: models/embedding-001)
+            model: Model to use (default: from settings)
             task_type: Task type for embedding optimization
         """
         self.api_key = api_key or settings.google_api_key
-        self.model = model
+        self.model = model or settings.embedding_model
         self.task_type = self.TASK_TYPES.get(task_type, "RETRIEVAL_DOCUMENT")
         self.logger = logger
 
