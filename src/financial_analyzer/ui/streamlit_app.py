@@ -292,7 +292,7 @@ def main():
             if st.session_state.rag_chain is None:
                 with st.spinner("🔄 Initializing AI model..."):
                     try:
-                        st.session_state.rag_chain = RAGChain(use_memory=True)
+                        st.session_state.rag_chain = RAGChain()
                     except Exception as e:
                         st.error(f"❌ Failed to initialize RAG chain: {str(e)}")
                         st.stop()
