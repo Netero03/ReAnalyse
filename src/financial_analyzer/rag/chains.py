@@ -85,9 +85,7 @@ class RAGChain:
         try:
             self.logger.info("Initializing Pinecone vector store")
 
-            self.pinecone_client = PineconeClient()
-
-            # Initialize LangChain wrapper
+            # Initialize LangChain wrapper (handles Pinecone connection internally)
             self.vector_store = Pinecone.from_existing_index(
                 index_name=settings.pinecone_index_name,
                 embedding=self.embeddings,
