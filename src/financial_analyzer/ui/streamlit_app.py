@@ -8,7 +8,6 @@ from pathlib import Path
 from financial_analyzer.ingest.document_loader import DocumentLoader
 from financial_analyzer.ingest.chunker import Chunker
 from financial_analyzer.embeddings.gemini_embedder import GeminiEmbedder
-from financial_analyzer.vector_store.pinecone_client import PineconeClient
 from financial_analyzer.rag.chains import RAGChain
 from financial_analyzer.config import settings
 from financial_analyzer.utils.logger import logger
@@ -110,24 +109,16 @@ def load_and_index_pdf(uploaded_file, progress_container):
             embeddings = embedder.embed_batch(chunk_contents, batch_size=10)
             status.write(f"✓ Generated {len(embeddings)} embeddings")
 
-            # Upsert to Pinecone
-            status.write("📌 Indexing in Pinecone...")
-            pinecone_client = PineconeClient()
-
-            vectors_to_upsert = []
-            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                vector_id = f"{uploaded_file.name.replace('.pdf', '')}_chunk_{i}"
-                chunk_metadata = chunk["metadata"].copy()
-                chunk_metadata["content"] = chunk["content"]
-
-                vectors_to_upsert.append((
-                    vector_id,
-                    embedding,
-                    chunk_metadata,
-                ))
-
-            pinecone_client.upsert_vectors(vectors_to_upsert)
-            status.write(f"✓ Indexed {len(vectors_to_upsert)} vectors")
+            # Store processed PDF info (actual Pinecone indexing happens during RAG queries)
+            status.write("📌 Storing document metadata...")
+            processed_pdfs = st.session_state.get("processed_pdfs", {})
+            processed_pdfs[uploaded_file.name] = {
+                "chunks": chunks,
+                "embeddings": embeddings,
+                "processed_at": str(datetime.now())
+            }
+            st.session_state.processed_pdfs = processed_pdfs
+            status.write(f"✓ Stored metadata for {len(chunks)} chunks")
             status.update(label=f"✅ {uploaded_file.name} processed successfully!", state="complete")
 
             return True
