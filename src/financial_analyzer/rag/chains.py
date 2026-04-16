@@ -134,6 +134,9 @@ class RAGChain:
                 
                 return documents
             
+            # Store retriever as instance attribute for use in query()
+            self.docs_retriever = retrieve_from_pinecone
+            
             # Build a custom retriever 
             def _format_docs(docs):
                 """Format retrieved documents into context string."""
@@ -189,7 +192,7 @@ class RAGChain:
             answer = self.chain.invoke({"question": input_text})
 
             # Retrieve source documents separately
-            source_documents = self.docs_retriever.invoke(question)
+            source_documents = self.docs_retriever({"question": question})
 
             # Format response
             response = {
@@ -197,8 +200,8 @@ class RAGChain:
                 "source_documents": source_documents,
                 "sources": [
                     {
-                        "source": str(doc.metadata.get("source", "Unknown")),
-                        "content": doc.page_content[:200] + "...",
+                        "source": str(doc.get("metadata", {}).get("source", "Unknown")),
+                        "content": doc.get("page_content", "")[:200] + "...",
                     }
                     for doc in source_documents
                 ],
