@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Gemini API Configuration
     google_api_key: str = Field(...)
     embedding_model: str = Field(default="models/gemini-embedding-2-preview")
-    model_name: str = Field(default="gemini-1.5-flash")
+    model_name: str = Field(default="models/gemini-2.5-flash")
 
     # Pinecone Configuration
     pinecone_api_key: str = Field(...)
