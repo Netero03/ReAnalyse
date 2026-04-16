@@ -2,15 +2,13 @@
 
 from typing import List, Dict, Optional, Any
 
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, Runnable
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import Pinecone
 
 from financial_analyzer.config import settings
 from financial_analyzer.embeddings.gemini_embedder import GeminiEmbedder
-from financial_analyzer.vector_store.pinecone_client import PineconeClient
 from financial_analyzer.rag.prompts import (
     get_system_prompt,
     get_question_prompt,
@@ -85,21 +83,16 @@ class RAGChain:
         try:
             self.logger.info("Initializing Pinecone vector store")
 
-            # Use Pinecone client directly from the new SDK
+            # Import Pinecone SDK
             from pinecone import Pinecone as PineconeClient
             
-            # Initialize with correct Pinecone API key (not Google API key)
-            pc = PineconeClient(api_key=settings.pinecone_api_key)
+            # Initialize Pinecone with correct API key
+            self.pc = PineconeClient(api_key=settings.pinecone_api_key)
             
-            # Initialize LangChain wrapper with the Pinecone index
-            self.vector_store = Pinecone(
-                index=pc.Index(settings.pinecone_index_name),
-                embedding=self.embeddings,
-                text_key="content",
-                namespace=settings.pinecone_namespace,
-            )
-
-            self.logger.info("Pinecone vector store initialized")
+            # Get the index
+            self.pinecone_index = self.pc.Index(settings.pinecone_index_name)
+            
+            self.logger.info("Pinecone vector store initialized successfully")
 
         except Exception as e:
             self.logger.error(f"Failed to initialize Pinecone: {str(e)}")
@@ -110,36 +103,49 @@ class RAGChain:
         try:
             self.logger.info("Initializing RAG chain")
 
-            # Create retriever
-            self.retriever = self.vector_store.as_retriever(
-                search_kwargs={
-                    "k": settings.max_retrieved_chunks,
-                }
-            )
-
             # Create prompt template
             prompt = get_question_prompt()
 
-            # Build the chain
-            # Uses LCEL (LangChain Expression Language) to:
-            # 1. Pass through the input question
-            # 2. Retrieve documents using the retriever
-            # 3. Format documents into context string
-            # 4. Create prompt with question and context
-            # 5. Run through LLM
-            # 6. Parse the output as string
+            # Define a custom retriever function that queries Pinecone directly
+            def retrieve_from_pinecone(input_dict: Dict) -> List[Dict[str, Any]]:
+                """Retrieve documents from Pinecone using query embedding."""
+                question = input_dict.get("question", "")
+                
+                # Get embedding for the question
+                question_embedding = self.embeddings.embed_query(question)
+                
+                # Query Pinecone
+                results = self.pinecone_index.query(
+                    vector=question_embedding,
+                    top_k=settings.max_retrieved_chunks,
+                    include_metadata=True,
+                    namespace=settings.pinecone_namespace
+                )
+                
+                # Format results as documents
+                documents = []
+                for match in results.get("matches", []):
+                    doc_content = match.get("metadata", {}).get("content", "")
+                    if doc_content:
+                        documents.append({
+                            "page_content": doc_content,
+                            "metadata": match.get("metadata", {})
+                        })
+                
+                return documents
             
+            # Build a custom retriever 
             def _format_docs(docs):
                 """Format retrieved documents into context string."""
-                return "\n\n".join(doc.page_content for doc in docs)
-            
-            # Store docs retrieval for source extraction
-            self.docs_retriever = self.retriever
+                if not docs:
+                    return "No relevant documents found."
+                return "\n\n".join(doc.get("page_content", "") for doc in docs)
             
             # Build the chain using LCEL
             self.chain = (
                 RunnablePassthrough.assign(
-                    context=self.retriever | _format_docs
+                    docs=lambda x: retrieve_from_pinecone({"question": x.get("question", "")}),
+                    context=lambda x: _format_docs(retrieve_from_pinecone({"question": x.get("question", "")}))
                 )
                 | prompt
                 | self.llm
