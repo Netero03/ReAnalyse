@@ -9,6 +9,7 @@ from financial_analyzer.ingest.document_loader import DocumentLoader
 from financial_analyzer.ingest.chunker import Chunker
 from financial_analyzer.embeddings.gemini_embedder import GeminiEmbedder
 from financial_analyzer.rag.chains import RAGChain
+from financial_analyzer.vector_store.pinecone_client import PineconeClient
 from financial_analyzer.config import settings
 from financial_analyzer.utils.logger import logger
 
@@ -109,12 +110,43 @@ def load_and_index_pdf(uploaded_file, progress_container):
             embeddings = embedder.embed_batch(chunk_contents, batch_size=10)
             status.write(f"✓ Generated {len(embeddings)} embeddings")
 
-            # Store processed PDF info (actual Pinecone indexing happens during RAG queries)
-            status.write("📌 Storing document metadata...")
+            # Index vectors in Pinecone
+            status.write("📌 Indexing in Pinecone...")
+            try:
+                pinecone_client = PineconeClient()
+                
+                # Prepare vectors for upsert: (id, embedding, metadata)
+                vectors_to_upsert = []
+                for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                    vector_id = f"{uploaded_file.name.replace('.pdf', '')}_{idx}"
+                    vector_metadata = {
+                        "source": uploaded_file.name,
+                        "content": chunk["content"],
+                        "chunk_index": idx,
+                        "total_chunks": len(chunks),
+                        **chunk.get("metadata", {})
+                    }
+                    vectors_to_upsert.append((vector_id, embedding, vector_metadata))
+                
+                # Upsert all vectors to Pinecone
+                pinecone_client.upsert_vectors(
+                    vectors_to_upsert,
+                    namespace=settings.pinecone_namespace
+                )
+                status.write(f"✓ Indexed {len(vectors_to_upsert)} vectors in Pinecone")
+                
+            except Exception as e:
+                logger.error(f"Failed to index in Pinecone: {str(e)}")
+                status.write(f"⚠️ Pinecone indexing warning: {str(e)}")
+                # Don't fail completely if Pinecone has issues, continue for now
+
+            # Store processed PDF info locally for reference
+            status.write("💾 Storing metadata locally...")
             processed_pdfs = st.session_state.get("processed_pdfs", {})
             processed_pdfs[uploaded_file.name] = {
                 "chunks": chunks,
                 "embeddings": embeddings,
+                "vector_count": len(vectors_to_upsert),
                 "processed_at": str(datetime.now())
             }
             st.session_state.processed_pdfs = processed_pdfs
