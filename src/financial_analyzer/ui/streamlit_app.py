@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# Add src directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 """Streamlit web interface for Financial Document Analyzer."""
 
 import streamlit as st
